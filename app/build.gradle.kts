@@ -5,9 +5,7 @@ plugins {
 android {
     namespace = "com.example.quassy_ai"
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
+        version = release(37)
     }
 
     defaultConfig {
@@ -42,4 +40,6 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    implementation("com.squareup.okhttp3:okhttp:5.4.0")
+    implementation("androidx.appcompat:appcompat:1.7.1")
 }
