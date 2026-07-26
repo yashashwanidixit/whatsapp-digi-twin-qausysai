@@ -13,7 +13,10 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
+import java.util.concurrent.TimeUnit
+
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,19 +39,55 @@ class MainActivity : AppCompatActivity() {
     private suspend fun callLocalModel(prompt: String): String {
         return withContext(Dispatchers.IO) {
             try {
-                val client = OkHttpClient()
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(60, TimeUnit.SECONDS)
+                    .readTimeout(180, TimeUnit.SECONDS)
+                    .writeTimeout(60, TimeUnit.SECONDS)
+                    .build()
+                val messages = JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("role", "system")
+                        put("content", """
+            Extract the contact name and the message from the user's command.
+            Reply with ONLY this format: contact|message
+            Do not add explanations, quotes, or extra text.
+
+            Examples:
+            User: tell mom that i will be late
+            Reply: mom|I will be late
+
+            User: message john i am on my way
+            Reply: john|I am on my way
+
+            User: send priya happy birthday
+            Reply: priya|Happy birthday
+
+            User: let dad know dinner is ready
+            Reply: dad|Dinner is ready
+        """.trimIndent())
+                    })
+                    put(JSONObject().apply {
+                        put("role", "user")
+                        put("content", prompt)
+                    })
+                }
                 val json = JSONObject().apply {
-                    put("prompt", "Extract the contact and message from: $prompt")
-                    put("n_predict", 150)
+                    put("messages", messages)
+                    put("max_tokens", 60)
+                    put("temperature", 0.0)
                 }
                 val body = json.toString().toRequestBody("application/json".toMediaType())
                 val request = Request.Builder()
-                    .url("http://127.0.0.1:8080/completion")
+                    .url("http://127.0.0.1:8080/v1/chat/completions")
                     .post(body)
                     .build()
                 client.newCall(request).execute().use { response ->
                     val responseText = response.body?.string() ?: "no response"
-                    JSONObject(responseText).getString("content")
+                    val jsonResponse = JSONObject(responseText)
+                    jsonResponse.getJSONArray("choices")
+                        .getJSONObject(0)
+                        .getJSONObject("message")
+                        .getString("content")
                 }
             } catch (e: Exception) {
                 "Error: ${e.message}"
